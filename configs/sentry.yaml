@@ -1,0 +1,199 @@
+enemy_color: "blue"
+#enemy_color: "blue"
+
+
+#####-----神经网络参数-----#####
+yolo_name: yolov5
+classify_model: assets/tiny_resnet.onnx
+yolo11_model_path: assets/yolo11.xml
+yolov8_model_path: assets/yolov8.xml
+yolov5_model_path: assets/yolov5.xml
+yolov5n_model_path: assets/Infantry-v5n-Release-20260725.xml
+yolov5_variant: yolov5n # original是原先的v5模型，yolov5n是2026深圳大学开源
+device: GPU
+min_confidence: 0.7
+use_traditional: true
+
+#####-----ROI-----#####
+roi: 
+  x: 420
+  y: 50
+  width: 600
+  height: 600
+
+use_roi: false
+
+# #####-----USB相机参数-----#####
+# image_width: 1280
+# image_height: 720
+# fov_h: 57.7 #87.7
+# fov_v: 56.7 
+# new_fov_h: 27 #67
+# new_fov_v: 40.9
+# usb_frame_rate: 120
+# usb_exposure: 500 #1-80000______250
+# usb_gamma: 160
+# usb_gain: 10 #0-96
+
+#####-----工业相机参数-----#####
+camera_name: "hikrobot"
+exposure_ms: 3.2
+gain: 16
+gamma: 0.8
+vid_pid: "2bdf:0001"
+
+#####-----传统方法参数-----#####
+threshold: 150 #二值化阈值
+max_angle_error: 45 # degree
+min_lightbar_ratio: 1.5
+max_lightbar_ratio: 20 #同上长宽比
+min_lightbar_length: 8 #最小长度
+min_armor_ratio: 1 #小装甲板长宽比
+max_armor_ratio: 5 #大装甲板长宽比
+max_side_ratio: 1.5 #最大边长比
+max_rectangular_error: 25 # 矩形度
+min_confidence: 0.8
+
+#####-----cboard参数-----#####
+quaternion_canid: 0x01
+bullet_speed_canid: 0x110
+send_canid: 0xff
+serial_baud: 115200
+
+#####-----gimbal参数-----#####
+com_port: "/dev/gimbal"
+serial_port: "/dev/gimbal"
+
+#####-----tracker参数-----#####
+min_detect_count: 5 #最小连续识别帧数
+max_temp_lost_count: 20 #最大临时丢失帧数
+outpost_max_temp_lost_count: 75 #前哨最大临时丢失帧数
+dt_timeout: 0.1 #帧间隔超过此值(s)自动重置为lost
+nis_failure_rate: 0.4 #NIS失败率超过此阈值时重置tracker
+switching_lost_count: 200 #switching状态下丢失多少帧后归位lost
+image_center_x: 720 #图像中心x (用于装甲板排序)
+image_center_y: 540 #图像中心y
+
+#####-----EKF观测器参数-----#####
+# 测量噪声R矩阵对角线
+ekf_r_yaw: 0.01 #观测yaw方差
+ekf_r_pitch: 0.01 #观测pitch方差
+# 注: R[2](distance)和R[3](angle)由动态公式计算，此处只配置前两项
+# 发散检测
+ekf_r_min: 0.05 #半径下限，低于此值判定发散
+ekf_r_max: 0.5 #半径上限，高于此值判定发散
+# 收敛判定
+min_converge_count: 3 #普通目标收敛所需最少更新帧数
+outpost_min_converge_count: 10 #前哨站收敛所需最少更新帧数
+# 前哨站特判
+outpost_v1: 10 #前哨站加速度方差
+outpost_v2: 0.1 #前哨站角加速度方差
+outpost_omega: 5.03 #前哨站强制角速度 (rad/s)
+outpost_omega_threshold: 2.0 #前哨站角速度超过此阈值时强制设定
+# 卡方检验
+nis_threshold: 9.488 #NIS阈值 χ²(4, 0.95)
+nees_threshold: 9.488 #NEES阈值
+nis_window_size: 100 #NIS滑动窗口大小
+outpost_delay_time: 0.2
+
+#####-----aimer参数-----#####
+yaw_offset: 0.7 # degree 偏置 (原-0.6偏左,右移0.9)
+pitch_offset: 0.5 # degree (原2偏高,降低1.2) -0.5
+comming_angle: 25
+leaving_angle: 18
+left_yaw_offset: 1
+right_yaw_offset: 1
+decision_speed: 1.5 # rad/s 决策速度阈值
+high_speed_delay_time: 0.032
+low_speed_delay_time: 0.03  # s
+outpost_delay_time: 0.4 # s 前哨站延迟
+low_speed_delay_time: 0.04  # 
+gyro_threshold: 2.0 # 角速度小于此值视为非小陀螺 (rad/s)
+max_shootable_angle: 60 # 非小陀螺时可射击角度阈值 (degree)
+outpost_coming_angle: 70 # 前哨站来向角度 (degree)
+outpost_leaving_angle: 30 # 前哨站去向角度 (degree)
+detector_delay: 0.005 # detector-aimer耗时假设 (s)
+aimer_min_bullet_speed: 14 # 弹速下限，低于此值使用默认弹速
+aimer_default_bullet_speed: 22 # 默认弹速 (m/s)
+fly_time_max_iter: 10 # 飞行时间迭代最大次数
+fly_time_converge: 0.001 # 飞行时间收敛阈值 (s)
+
+#####-----shooter参数-----#####
+first_tolerance: 4.0 # 近距离射击容差，degree
+second_tolerance: 4.7 # 远距离射击容差，degrees
+judge_distance: 3 #距离判断阈值
+auto_fire: true # 是否由自瞄控制射击  2006
+min_fire_count: 3 # 连续多少帧满足条件才开火
+command_jump_multiplier: 2.0 # command突变阈值=tolerance×此倍数
+
+# #####-----planner-----#####
+fire_thresh: 0.005
+
+max_yaw_acc: 10
+Q_yaw: [9e6, 0]
+R_yaw: [1]
+
+max_pitch_acc: 100
+Q_pitch: [9e6, 0]
+R_pitch: [1]
+
+shoot_offset: 2 # 射击判定提前步数 (步数×DT=提前时间)
+mpc_max_iter: 10 # TinyMPC最大迭代次数
+min_bullet_speed: 15 # 弹速合法范围下限 (m/s)
+max_bullet_speed: 25 # 弹速合法范围上限 (m/s)
+default_bullet_speed: 20.3 # 弹速异常时的默认值 (m/s)
+
+####----方差----####
+v1: 12.2 #加速度方差
+v2: 8 #角速度方差
+dt: 0.1
+
+#####-----decider参数-----#####
+mode: 1
+
+#####-----工业相机标定参数-----#####
+R_gimbal2imubody: [-1, 0, 0, 0, -1, 0, 0, 0, 1]
+# 重投影误差: 0.0620px
+camera_matrix: [1740.5363161481298, 0, 664.1903880468484, 0, 1739.7526411403182, 555.38605888356824, 0, 0, 1]
+distort_coeffs: [-0.060558750720745277, 0.071677319261589142, 0.00102465773126163, -0.0033962621118819123, 0]
+
+R_camera2gimbal: [0, 0, 1, -1, 0, 0, 0, -1, 0]
+t_camera2gimbal: [0.17414, 0.085, 0.04541]
+
+#####-----buff参数-----#####
+model: "assets/yolo11_buff_int8.xml"
+buff_confidence_threshold: 0.60 # 小能量机关先用更稳的阈值，减少时有时无导致的目标跳变
+buff_iou_threshold: 0.40       # 降低重复框残留，减少同一扇叶被识别成多个候选时的抖动
+
+#####-----buff_aimer参数-----#####
+# 线性偏置模型: offset(deg) = k × angle(deg) + b
+# yaw偏置 = k × base_yaw(deg) + b
+buff_yaw_offset_k: 0.0  # 斜率(无量纲)，正值=yaw越大偏置越大（左边偏里调大）
+buff_yaw_offset_b: -1.5   # 截距(degree)，yaw=0时的偏置
+# pitch偏置 = k × base_pitch + cross_k × base_yaw + b
+buff_pitch_offset_k: 0.05  # 斜率(无量纲)，正值=pitch越大偏置越大（打高偏低调大）
+buff_pitch_yaw_cross_k: -0.04  # 交叉耦合(无量纲)，负值=左边降pitch右边升pitch（修正左上右下）
+buff_pitch_offset_b: 1.7 # 截距(degree)，pitch=0时的偏置
+# 打符瞄准点微调已改为相对偏移，见下方 hw_buff.aim_radius_offset (旧键 buff_aim_radius 仍兼容)
+fire_gap_time: 0.600 # s
+predict_time: 0.213 # s (打慢了加大提前量)
+
+# ===== HW auto_buff 配置 =====
+hw_buff:
+  engine_path: "/home/asus/Alan/2027_preview/tasks/auto_buff/hw_buff_algo/config/buff.engine"
+  config_dir: "/home/asus/Alan/2027_preview/tasks/auto_buff/hw_buff_algo/config"
+  aim_radius_offset: 0.0  # m，在"符中心->扇叶中心"方向外推；0=扇叶中心, +0.08≈装甲板中心
+                            # 实测扇叶中心真实半径 ≈0.55m（旧版硬编码 0.70m 偏大 0.15m）
+  buff_color: 1        # 0=蓝方, 1=红方
+  # 注意：以下 buff_mode / buff_color / confidence_threshold / nms_threshold
+  #       目前没有任何 C++ 代码读取，改它们不会生效。
+  #       小符/大符由程序里构造 SmallTarget 还是 BigTarget 决定：
+  #       auto_buff_debug_mpc 固定用 SmallTarget（强制小符）。
+  buff_mode: 1         # 1=小符, 2=大符（当前仅为记录，不生效）
+  confidence_threshold: 0.5
+  nms_threshold: 0.45
+
+
+# ===== SZU RuneModel 配置 =====
+rune_model:
+  path: "/home/asus/Alan/2027_preview/assets/rune_model/Rune-v8n-fp16-20260624-D14367-B16.xml"

@@ -1,0 +1,22 @@
+pattern_cols: 10
+pattern_rows: 7
+center_distance_mm: 20
+
+R_gimbal2imubody: [1, 0, 0, 0, 1, 0,  0, 0, 1]
+
+camera_name: "hikrobot"
+exposure_ms: 5
+gain: 18.0
+vid_pid: "2bdf:0001"
+
+#####-----gimbal串口参数-----#####
+com_port: "/dev/gimbal"  # 使用符号链接，不会因设备编号变化而失效
+# 重投影误差: 0.0296px
+camera_matrix: [1796.7051631424611, 0, 707.86139888664422, 0, 1794.8650483355925, 514.7564430977252, 0, 0, 1]
+distort_coeffs: [-0.053935005818347745, 0.099523851213960096, -0.0023468801956506758, 6.48251983705048e-05, 0]
+
+# 相机同理想情况的偏角: yaw-0.10 pitch-2.21 roll4.88 degree
+# 标定板到世界坐标系原点的水平距离: 0.98 m
+# 标定板同竖直摆放时的偏角: yaw11.12 pitch14.80 roll3.87 degree
+R_camera2gimbal: [0, 0, 1, -1, 0, 0, 0, -1, 0]
+t_camera2gimbal: [0.11994017, 0.0, 0.16147]
