@@ -24,11 +24,7 @@ public:
   explicit Buff_Detector(const std::string & config);
   ~Buff_Detector();
 
-  std::optional<PowerRune> detect_24(cv::Mat & bgr_img);
-
   std::optional<PowerRune> detect(cv::Mat & bgr_img);
-
-  std::optional<PowerRune> detect_debug(cv::Mat & bgr_img, cv::Point2f v);
 
 private:
   void handle_lose();

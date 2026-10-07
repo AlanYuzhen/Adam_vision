@@ -26,9 +26,6 @@ public:
 
   void solve(std::optional<PowerRune> & ps) const;
 
-  // 调试用
-  cv::Point2f point_buff2pixel(cv::Point3f x);
-
   std::vector<cv::Point2f> reproject_buff(
     const Eigen::Vector3d & xyz_in_world, double yaw, double row) const;
 
@@ -40,8 +37,6 @@ private:
   Eigen::Vector3d t_camera2gimbal_;
   Eigen::Matrix3d R_gimbal2world_;
 
-  cv::Vec3d rvec_, tvec_;
-
   // HW BuffPnPSolver：IPPE 平面四点 PnP，模型尺寸 BUFF_WIDTH=0.114m
   // mutable：solve() 为 const，而 solve_pnp 内部会更新状态
   mutable buff_algo::BuffPnPSolver pnp_solver_;
@@ -50,12 +45,6 @@ private:
   const std::vector<cv::Point3f> OBJECT_POINTS = {
     cv::Point3f(0, 0, 114e-3), cv::Point3f(0, 114e-3, 0),
     cv::Point3f(0, 0, -114e-3), cv::Point3f(0, -114e-3, 0)};  // 单位：米
-
-  // 函数：生成绕x轴旋转的旋转矩阵
-  cv::Matx33f rotation_matrix(double angle) const;
-
-  // 函数：旋转点并填充到 OBJECT_POINTS 中
-  void compute_rotated_points(std::vector<std::vector<cv::Point3f>> & object_points);
 
   // 用模型直接输出的 R 字中心像素点，与扇叶所在平面求交，得到相机系 3D 符中心。
   // 失败（视线与平面近平行 / 交点明显不合理）返回 false，调用方回退到几何法。

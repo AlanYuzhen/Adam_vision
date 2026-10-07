@@ -41,11 +41,6 @@ void Buff_Detector::handle_lose()
   }
 }
 
-std::optional<PowerRune> Buff_Detector::detect_24(cv::Mat & bgr_img)
-{
-  return detect(bgr_img);
-}
-
 std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
 {
   if (!rune_model_) {
@@ -104,11 +99,6 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
   P.emplace(powerrune);
   last_powerrune_ = P;
   return P;
-}
-
-std::optional<PowerRune> Buff_Detector::detect_debug(cv::Mat & bgr_img, cv::Point2f)
-{
-  return detect(bgr_img);
 }
 
 }  // namespace auto_buff

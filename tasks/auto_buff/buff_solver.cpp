@@ -5,28 +5,6 @@
 #include "tools/logger.hpp"
 namespace auto_buff
 {
-cv::Matx33f Solver::rotation_matrix(double angle) const
-{
-  return cv::Matx33f(
-    1, 0, 0, 0, std::cos(angle), -std::sin(angle), 0, std::sin(angle), std::cos(angle));
-}
-
-void Solver::compute_rotated_points(std::vector<std::vector<cv::Point3f>> & object_points)
-{
-  const std::vector<cv::Point3f> & base_points = object_points[0];
-  for (int i = 1; i < 5; ++i) {
-    double angle = i * THETA;
-    cv::Matx33f R = rotation_matrix(angle);
-    std::vector<cv::Point3f> rotated_points;
-    for (const auto & point : base_points) {
-      cv::Vec3f vec(point.x, point.y, point.z);
-      cv::Vec3f rotated_vec = R * vec;
-      rotated_points.emplace_back(rotated_vec[0], rotated_vec[1], rotated_vec[2]);
-    }
-    object_points[i] = rotated_points;
-  }
-}
-
 Solver::Solver(const std::string & config_path) : R_gimbal2world_(Eigen::Matrix3d::Identity())
 {
   auto yaml = YAML::LoadFile(config_path);
@@ -179,17 +157,6 @@ bool Solver::r_center_by_ray(
   if (!(s > 0.1 && s < 100.0)) return false;  // 交点在相机后方或远得离谱
   r_center_cam = s * ray;
   return true;
-}
-
-// 调试用
-cv::Point2f Solver::point_buff2pixel(cv::Point3f x)
-{
-  // buff坐标系(单位:m)到像素坐标系
-  std::vector<cv::Point3d> world_points;
-  std::vector<cv::Point2d> image_points;
-  world_points.push_back(x);
-  cv::projectPoints(world_points, rvec_, tvec_, camera_matrix_, distort_coeffs_, image_points);
-  return image_points.back();
 }
 
 // xyz_in_world2xyz_in_pix
