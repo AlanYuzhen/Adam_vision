@@ -130,6 +130,20 @@ void Solver::solve(std::optional<PowerRune> & ps) const
   // ypr_in_world：R_buff2world 的欧拉角（cam->gimbal 同样先乘 R_fix）
   Eigen::Matrix3d R_buff2world = R_gimbal2world_ * R_fix * R_buff2cam;
   p.ypr_in_world = tools::eulers(R_buff2world, 2, 1, 0);
+
+  // ---- 副候选 3D 推算（双候选支持）----
+  // 副候选叶与主候选叶共面（符为平面机构，扇叶面板均垂直符轴），
+  // 无需独立 PnP：副候选中心像素反投影成射线，与主候选扇叶平面求交即得 cam 系 3D。
+  p.extra_armor_centers_in_world.clear();
+  p.extra_armor_centers_in_world.reserve(p.extra_blades_pix.size());
+  for (const auto & quad : p.extra_blades_pix) {
+    const cv::Point2f c = (quad[0] + quad[1] + quad[2] + quad[3]) * 0.25f;
+    Eigen::Vector3d armor_cam;
+    if (r_center_by_ray(c, R_buff2cam, xyz_in_camera, armor_cam)) {
+      p.extra_armor_centers_in_world.emplace_back(
+        R_gimbal2world_ * (R_fix * armor_cam + t_camera2gimbal_));
+    }
+  }
 }
 
 // 反投影模型给出的 R 字中心像素 -> 与扇叶平面求交 -> 相机系(前x左y上z) 3D 点
@@ -157,6 +171,20 @@ bool Solver::r_center_by_ray(
   if (!(s > 0.1 && s < 100.0)) return false;  // 交点在相机后方或远得离谱
   r_center_cam = s * ray;
   return true;
+}
+
+// 世界系单点 -> 像素：world -> gimbal -> camera(前x左y上z) -> opencv(右x下y前z) -> 投影
+cv::Point2f Solver::reproject_point(const Eigen::Vector3d & xyz_in_world) const
+{
+  const Eigen::Vector3d p_gimbal = R_gimbal2world_.transpose() * xyz_in_world;
+  const Eigen::Vector3d p_cam = R_camera2gimbal_.transpose() * (p_gimbal - t_camera2gimbal_);
+  const Eigen::Vector3d p_cv(p_cam.y(), -p_cam.z(), p_cam.x());
+
+  const std::vector<cv::Point3f> obj{cv::Point3f(
+    static_cast<float>(p_cv.x()), static_cast<float>(p_cv.y()), static_cast<float>(p_cv.z()))};
+  std::vector<cv::Point2f> out;
+  cv::projectPoints(obj, cv::Vec3d(0, 0, 0), cv::Vec3d(0, 0, 0), camera_matrix_, distort_coeffs_, out);
+  return out.empty() ? cv::Point2f(0, 0) : out[0];
 }
 
 // xyz_in_world2xyz_in_pix

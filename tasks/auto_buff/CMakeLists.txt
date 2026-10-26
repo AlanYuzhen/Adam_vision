@@ -14,6 +14,9 @@ add_library(auto_buff OBJECT
     buff_solver.cpp
     buff_aimer.cpp
     buff_target.cpp
+    big_rune/BigRunePhaseMotionFilter.cpp
+    big_rune/LM_IRLS_BigRunePhaseMotionFilter.cpp
+    big_rune/big_rune_tracker.cpp
 )
 
 # 合并 SZU RuneModel + HW buff 算法链
@@ -25,3 +28,8 @@ target_include_directories(auto_buff PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/hw_buff_algo/include
   ${CMAKE_CURRENT_SOURCE_DIR}/szu_nn/interface
 )
+
+# 本目录也作为公开 include 路径：
+# - big_rune 模块内部相互 include 用 "big_rune/xxx" 前缀，需要 -I tasks/auto_buff 才能解析
+# - PUBLIC：OBJECT 库的 include 路径传递给链接本库的 src/tests 可执行目标
+target_include_directories(auto_buff PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

@@ -29,6 +29,9 @@ public:
   std::vector<cv::Point2f> reproject_buff(
     const Eigen::Vector3d & xyz_in_world, double yaw, double row) const;
 
+  // 世界系单点 -> 像素（不依赖 buff 姿态参数，供任意 3D 调试点重投影）
+  cv::Point2f reproject_point(const Eigen::Vector3d & xyz_in_world) const;
+
 private:
   cv::Mat camera_matrix_;
   cv::Mat distort_coeffs_;

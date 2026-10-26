@@ -190,6 +190,39 @@ hw_buff:
   confidence_threshold: 0.5
   nms_threshold: 0.45
 
+  # ===== 大符相位运动估计（迁移自 RP-26Rune，键名与其 config/power_rune.json 一致）=====
+  # 运动方程 phase(t) = A*cos(ωt) + B*sin(ωt) + b*t + C，LM 外层迭代 ω、IRLS 内层拟合 A/B/b/C。
+  # 缺省键回退为代码内默认值（即 RP 线上值）。
+  big_phase_motion_estimate:
+    max_time_interval: 3.0                # 相邻帧最大间隔(s)，超过则重置方程
+    prepare_time: 180                     # 间隔超过此值连旋转方向一起重置
+    window_settling_time: 8.0             # 原始候选队列滑窗时长(s)
+    min_data_size_to_build_motion_model: 100  # 建模所需最少帧数
+    acceptable_time_interval_to_confirm_rotation: 0.15  # 判旋转方向的最大帧间隔(s)
+    target_switch_threshold: 0.77         # 相位跳变判定阈值(rad)
+    expect_phase_linear_velocity: 1.1775  # 建模前猜相位的线速度(rad/s)
+    highest_time_weight: 1.0              # 时间权重上限
+    lowwest_time_weight: 0.2              # 时间权重下限
+    filter_window_size: 7                 # 模型滤波窗口(奇数)
+    speed_angular_frequency_init: 1.942   # ω 初值
+    phase_cos_coefficient_init: -0.3322528  # A 初值
+    phase_sin_coefficient_init: 0.3322528   # B 初值
+    phase_linear_velocity_init: 1.1775    # b 初值
+    phase_constant_offset_radians_init: 0 # C 初值
+    omega_lower_bound: 1.884              # ω 下界(RM 规则 0.2 rev/s)
+    omega_upper_bound: 2.000              # ω 上界
+    outer_max_iterations: 20              # LM 外层最大迭代
+    inner_max_iterations: 40              # IRLS 内层最大迭代
+    robust_scale_factor: 2.5              # Cauchy 鲁棒核尺度因子
+    inner_tolerance: 1.0e-2               # 内层收敛阈值
+    lambda_init: 1.0e-2                   # LM 阻尼初值
+    lambda_min: 1.0e-6
+    lambda_max: 1000000.0
+    outer_tolerance: 1.0e-5               # 外层收敛阈值
+    max_omega_step: 0.05                  # 单次 ω 步长上限
+    diff_eps_min: 1.0e-4                  # 数值微分最小步长
+    diff_eps_rel_init: 1.0e-3             # 数值微分相对步长
+
 
 # ===== SZU RuneModel 配置 =====
 rune_model:

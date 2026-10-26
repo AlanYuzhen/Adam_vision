@@ -87,6 +87,16 @@ std::optional<PowerRune> Buff_Detector::detect(cv::Mat & bgr_img)
   /// 生成PowerRune（r_center 直接使用模型输出的 R 字中心）
   PowerRune powerrune(fanblades, point_r, last_powerrune_);
 
+  /// 双候选收集：取与主候选同类别、置信度次高的另一片叶。
+  /// 大符切换期两叶短暂同亮，此时 results[1] 是另一片亮叶；相位引擎用双候选
+  /// 做连续目标切换（避免单候选在切换瞬间被误判成跳变）。每帧至多 1 个副候选。
+  for (size_t i = 1; i < results.size() && powerrune.extra_blades_pix.empty(); i++) {
+    if (results[i].class_id != r.class_id) continue;
+    powerrune.extra_blades_pix.push_back(
+      {cv::Point2f(results[i].top), cv::Point2f(results[i].left),
+       cv::Point2f(results[i].bottom), cv::Point2f(results[i].right)});
+  }
+
   /// handle error
   if (powerrune.is_unsolve()) {
     handle_lose();

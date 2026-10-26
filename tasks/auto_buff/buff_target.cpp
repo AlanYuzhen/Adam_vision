@@ -152,47 +152,93 @@ void SmallTarget::predict(double dt)
   spd = state_.roll_velocity;
 }
 
-/// BigTarget
+/// BigTarget（大符：big_rune 相位运动引擎）
 
 BigTarget::BigTarget() : Target() {}
 
 BigTarget::BigTarget(const std::string & config_path) : Target()
 {
-  init_hw_chain(config_path, buff_algo::BuffMode::BIG_BUFF, tracker_, predictor_);
+  // 读 hw_buff.big_phase_motion_estimate（键名与 RP-26Rune 一致，缺块则用默认值=RP 线上值）
+  auto yaml = YAML::LoadFile(config_path);
+  big_rune::MotionFilterParams cfg;
+  const auto & hw = yaml["hw_buff"];
+  if (hw && hw["big_phase_motion_estimate"]) {
+    cfg = big_rune::MotionFilterParams::from_yaml(hw["big_phase_motion_estimate"]);
+  }
+  engine_ = std::make_shared<BigRuneTracker>(cfg);
 }
 
 void BigTarget::get_target(
   const std::optional<PowerRune> & p, std::chrono::steady_clock::time_point & timestamp)
 {
-  if (!tracker_) {
+  if (!engine_) {
     unsolvable_ = true;
     return;
   }
-  const double ts = std::chrono::duration<double>(timestamp.time_since_epoch()).count();
 
   if (!p.has_value()) {
-    lost_cn_++;
-    if (lost_cn_ > 15) {
-      tracker_->reset();
-      first_in_ = true;
-      unsolvable_ = true;
-      return;
-    }
-  } else {
-    lost_cn_ = 0;
+    // 丢帧：引擎内部按时间窗自动裁剪、间隔过大自动重置；连续丢 15 帧彻底重建
+    // （与 SmallTarget 的丢帧重置策略一致）
+    engine_->update_lost();
+    if (engine_->is_unsolve()) unsolvable_ = true;
+    return;
   }
 
-  unsolvable_ = !update_hw(
-    p, ts, tracker_, predictor_, state_, R_gimbal2world_, t_camera2gimbal_, R_fix_,
-    aim_point_world_, first_in_);
+  const PowerRune & pr = p.value();
+
+  // solver 提前返回时（四点缺失/PnP 失败）不会填充位姿字段，pose_camera 保持
+  // 默认单位阵。这种脏帧不能喂给相位引擎（无 NIS 卡方兜底，会污染拟合窗口），
+  // 按丢帧处理。PnP 成功帧的旋转块不可能恰为单位阵，判据安全。
+  if (pr.pose_camera.isApprox(Eigen::Matrix4d::Identity())) {
+    engine_->update_lost();
+    return;
+  }
+
+  // 缓存 ekf_x() 等价调试量的数据来源
+  last_r_center_world_ = pr.blade_xyz_in_world;  // R 心世界坐标（历史命名字段，语义为 R 心）
+  last_yaw_ = pr.ypr_in_world[0];                // 符面 yaw（观测欧拉角）
+
+  engine_->update(pr, timestamp);
+
+  // 同步基类调试字段（state_ 为 HW 专有，新引擎不填充，保持默认零值）
+  R_gimbal2world_ = pr.R_gimbal2world;
+  t_camera2gimbal_ = pr.t_camera2gimbal;
+  R_fix_ = pr.R_fix;
+
+  unsolvable_ = false;
+  aim_point_world_ = engine_->aim_point();
 }
 
 void BigTarget::predict(double dt)
 {
-  if (!tracker_ || !predictor_ || unsolvable_) return;
-  Eigen::Vector3f leaf_cam = predictor_->predict_position(static_cast<float>(dt));
-  aim_point_world_ = R_gimbal2world_ * (R_fix_ * leaf_cam.cast<double>() + t_camera2gimbal_);
-  spd = state_.roll_velocity;
+  if (!engine_ || unsolvable_) return;
+  // dt 从"拍照时刻"起算（含 detect_now_gap + 飞行时间），引擎以绝对时间戳
+  // 为参数预测，天然覆盖拍照->当前->飞行的全链路延迟
+  aim_point_world_ = engine_->predict_aim_point(dt);
+  spd = engine_->speed_now();
+}
+
+double BigTarget::predict_roll(double dt) const
+{
+  return engine_ ? engine_->predict_roll(dt) : 0.0;
+}
+
+Eigen::VectorXd BigTarget::ekf_x() const
+{
+  // 等价调试向量（语义对齐基类 HW 版）：
+  // x[0]=R_yaw x[1]=R_V_yaw x[2]=R_pitch x[3]=R_dis
+  // x[4]=符面yaw x[5]=roll(相位 mod 2π) x[6]=角速度
+  Eigen::VectorXd x(7);
+  x.setZero();
+
+  Eigen::Vector3d ypd = tools::xyz2ypd(last_r_center_world_);
+  x[0] = ypd[0];
+  x[2] = ypd[1];
+  x[3] = ypd[2];
+  x[4] = last_yaw_;
+  x[5] = predict_roll(0.0);
+  x[6] = engine_ ? engine_->speed_now() : 0.0;
+  return x;
 }
 
 }  // namespace auto_buff

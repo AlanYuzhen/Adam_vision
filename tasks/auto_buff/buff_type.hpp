@@ -2,6 +2,7 @@
 #define BUFF__TYPE_HPP
 
 #include <algorithm>
+#include <array>
 #include <deque>
 #include <eigen3/Eigen/Dense>  // 必须在opencv2/core/eigen.hpp上面
 #include <opencv2/core/eigen.hpp>
@@ -62,6 +63,13 @@ public:
   // 符中心(blade_xyz_in_world)的来源：true=用模型输出的 R 点射线求交，
   // false=射线求交失败后回退到"扇叶中心 + 0.7m"的几何法（调试用）
   bool r_center_is_measured = false;
+
+  // ---- 双候选支持（大符相位引擎 RP-26Rune 迁移配套）----
+  // 同帧检测到的副候选扇叶（像素四角 top/left/bottom/right，与主候选同类别）。
+  // 大符两叶短暂同亮的切换期出现；detector 收集、solver 推算 3D。
+  std::vector<std::array<cv::Point2f, 4>> extra_blades_pix;
+  // solver 填充：副候选靶心世界坐标（与 extra_blades_pix 一一对应，求交失败的不入列）
+  std::vector<Eigen::Vector3d> extra_armor_centers_in_world;
 
   explicit PowerRune(
     std::vector<FanBlade> & ts, const cv::Point2f r_center,

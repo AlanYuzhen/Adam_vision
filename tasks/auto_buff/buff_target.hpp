@@ -10,6 +10,7 @@
 
 #include "buff_algo/predictor/buff_predictor.hpp"
 #include "buff_algo/tracker/buff_tracker.hpp"
+#include "big_rune/big_rune_tracker.hpp"
 #include "buff_detector.hpp"
 #include "buff_type.hpp"
 #include "tools/math_tools.hpp"
@@ -35,7 +36,8 @@ public:
   bool is_unsolve() const;
 
   // 兼容旧接口：x[4]=yaw, x[5]=roll, x[6]=roll_velocity（调试/aimer 使用）
-  Eigen::VectorXd ekf_x() const;
+  // virtual：BigTarget 新引擎（big_rune）无 HW EKF，需自行填充等价调试量
+  virtual Eigen::VectorXd ekf_x() const;
 
   double spd = 0;  // 调试用
 
@@ -49,6 +51,8 @@ public:
   // 运行时切换小符/大符：转发给 tracker，模式变化时 tracker 内部会 reset
   // 观测器与状态机，重新从 CONVERGING 收敛（模式不变时调用无副作用）。
   // SmallTarget/BigTarget 的区别仅在构造时的初始模式，运行期可用本接口互切。
+  // 注意：BigTarget 新引擎不走 HW tracker，本接口对其无效（大符引擎切换见
+  // auto_buff_debug_mpc 的双对象分派）。
   void set_mode(buff_algo::BuffMode mode)
   {
     if (tracker_) tracker_->set_mode(mode);
@@ -59,8 +63,9 @@ public:
   // 它就是最终参与弹道解算的"飞行时间时域瞄准点"。
   Eigen::Vector3d aim_point_world() const { return aim_point_world_; }
 
-  // 预测"从状态基准时刻起 dt 秒后"的扇叶 roll（弧度），内部含 state_age 补偿
-  double predict_roll(double dt) const
+  // 预测"从状态基准时刻起 dt 秒后"的扇叶 roll（弧度）。
+  // virtual：BigTarget 新引擎以相位模型直接预测（基类实现依赖 HW predictor）。
+  virtual double predict_roll(double dt) const
   {
     return predictor_ ? static_cast<double>(predictor_->predict_roll(static_cast<float>(dt)))
                       : 0.0;
@@ -97,7 +102,10 @@ public:
   void predict(double dt) override;
 };
 
-/// BigTarget（大符：BIG_BUFF 模式，RANSAC 正弦拟合）
+/// BigTarget（大符：相位运动估计引擎，迁移自 RP-26Rune）
+// 内部不再使用 HW tracker/predictor：由 BigRuneTracker 完成相位连续化、
+// 双候选目标切换与 LM+IRLS 正弦模型拟合，predict 输出世界系打击点。
+// 对外接口与 SmallTarget 完全一致（aimer / 上层程序零改动）。
 
 class BigTarget : public Target
 {
@@ -109,6 +117,20 @@ public:
     const std::optional<PowerRune> & p, std::chrono::steady_clock::time_point & timestamp) override;
 
   void predict(double dt) override;
+
+  double predict_roll(double dt) const override;
+  Eigen::VectorXd ekf_x() const override;
+
+  // 新引擎直读接口（调试用；常规链路请走基类接口）
+  const std::shared_ptr<BigRuneTracker> & engine() const { return engine_; }
+
+private:
+  // shared_ptr：target 可拷贝（浅共享引擎状态，与基类 tracker_ 风格一致）
+  std::shared_ptr<BigRuneTracker> engine_;
+
+  // ekf_x() 等价调试量的数据来源（最近观测缓存）
+  Eigen::Vector3d last_r_center_world_ = Eigen::Vector3d::Zero();
+  double last_yaw_ = 0.0;
 };
 
 }  // namespace auto_buff

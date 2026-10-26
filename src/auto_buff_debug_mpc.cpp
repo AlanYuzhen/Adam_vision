@@ -65,14 +65,17 @@ int main(int argc, char * argv[])
   auto_buff::Buff_Detector detector(config_path);
   auto_buff::Solver solver(config_path);
 
-  // 初始为 SmallTarget；运行时按电控 mode 动态切换（见主循环 target.set_mode）
-  auto_buff::SmallTarget target(config_path);
+  // 大符链路已替换为 big_rune 相位运动引擎（RP-26Rune 迁移），BigTarget 不再依赖
+  // HW tracker 的 set_mode 切换——改用双对象 + 引用分派：小符/大符各自持有引擎，
+  // 按当前模式把基类引用 target 绑定到对应对象，后续调试代码保持原变量名不动。
+  auto_buff::SmallTarget small_target(config_path);
+  auto_buff::BigTarget big_target(config_path);
   auto_buff::Aimer aimer(config_path);
 
   // ===== 运行模式说明（选自 config: hw_buff.run_mode）=====
   // run_mode=1：跟随电控 mode（0/1 不控制，2→小符，3→大符）；
   // run_mode=2：无视电控，强制小符；run_mode=3：无视电控，强制大符。
-  // 切换通过 Target::set_mode 实现，模式变化时 tracker 自动 reset 重新收敛。
+  // 大符引擎从建模开始（约 100 帧），模式切换/重新进入大符时会自动重新收敛。
   if (run_mode == 2)
     tools::logger()->info("[auto_buff_debug_mpc] 强制小符模式（忽略电控 mode）。");
   else if (run_mode == 3)
@@ -94,13 +97,15 @@ int main(int argc, char * argv[])
     // -------------- 打符核心逻辑 --------------
 
     // 模式门控：
-    // run_mode=2/3 → 有效模式直接定为 SMALL/BIG_BUFF，每帧 set_mode（无副作用）；
+    // run_mode=2/3 → 有效模式直接定为 SMALL/BIG_BUFF；
     // run_mode=1   → 有效模式=电控 mode：2=小符, 3=大符，其余模式只跟踪、不瞄准不开火。
     const auto mode = (run_mode == 2)   ? io::GimbalMode::SMALL_BUFF: (run_mode == 3) ? io::GimbalMode::BIG_BUFF: gimbal.mode();
-    if (mode == io::GimbalMode::SMALL_BUFF)
-      target.set_mode(buff_algo::BuffMode::SMALL_BUFF);
-    else if (mode == io::GimbalMode::BIG_BUFF)
-      target.set_mode(buff_algo::BuffMode::BIG_BUFF);
+    // 引用分派：小符走 SmallTarget（HW 链路），大符走 BigTarget（big_rune 相位引擎）。
+    // 非打符模式绑 small_target 仅喂空观测，保持状态机推进语义不变。
+    auto_buff::Target & target =
+      (mode == io::GimbalMode::BIG_BUFF)
+        ? static_cast<auto_buff::Target &>(big_target)
+        : static_cast<auto_buff::Target &>(small_target);
     const bool buff_mode =
       mode == io::GimbalMode::SMALL_BUFF || mode == io::GimbalMode::BIG_BUFF;
 
@@ -169,18 +174,33 @@ int main(int argc, char * argv[])
       tools::draw_point(img, p.r_center, {0, 0, 255}, 3);
 
       // 当前帧target更新后buff
-      auto Rxyz_in_world_now = target.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.0));
-      auto image_points =
-        solver.reproject_buff(Rxyz_in_world_now, target.ekf_x()[4], target.ekf_x()[5]);
-      tools::draw_points(img, image_points, {0, 255, 0});
+      if (mode == io::GimbalMode::BIG_BUFF) {
+        // 大符（big_rune 相位引擎）：HW 的 yaw/roll 重投影语义不再适用，
+        // 直接重投影引擎输出的世界系打击点。
+        // 绿点=当前打击点(dt=0)，蓝点=pred_h 时域预测点；建模收敛后蓝点应稳定领先绿点。
+        tools::draw_point(
+          img, solver.reproject_point(big_target.engine()->predict_aim_point(0.0)), {0, 255, 0}, 3);
+        tools::draw_point(
+          img, solver.reproject_point(big_target.engine()->predict_aim_point(pred_h)), {255, 0, 0},
+          3);
+      } else {
+        // 小符（HW 链路）：当前帧姿态重投影
+        auto Rxyz_in_world_now = target.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.0));
+        auto image_points =
+          solver.reproject_buff(Rxyz_in_world_now, target.ekf_x()[4], target.ekf_x()[5]);
+        tools::draw_points(img, image_points, {0, 255, 0});
 
-      // buff瞄准位置(预测)：用 pred_h 时域的预测 roll 重投影，蓝点应稳定领先绿点
-      // （注：target 与 target_copy 浅拷贝共享 EKF，二者 ekf_x() 相同，旧的
-      //  dangle 恒为 0，故这里改用 predict_roll 的结果画出真正的预测姿态）
+        // buff瞄准位置(预测)：用 pred_h 时域的预测 roll 重投影，蓝点应稳定领先绿点
+        // （注：target 与 target_copy 浅拷贝共享 EKF，二者 ekf_x() 相同，旧的
+        //  dangle 恒为 0，故这里改用 predict_roll 的结果画出真正的预测姿态）
+        auto Rxyz_in_world_pre = target.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.0));
+        image_points = solver.reproject_buff(
+          Rxyz_in_world_pre, target_copy.ekf_x()[4], target_copy.predict_roll(pred_h));
+        tools::draw_points(img, image_points, {255, 0, 0});
+      }
+
+      // pred_h 时域的预测 roll（小符=HW predictor；大符=相位引擎，roll 语义兼容）
       const double pred_roll = target_copy.predict_roll(pred_h);
-      auto Rxyz_in_world_pre = target.point_buff2world(Eigen::Vector3d(0.0, 0.0, 0.0));
-      image_points = solver.reproject_buff(Rxyz_in_world_pre, target_copy.ekf_x()[4], pred_roll);
-      tools::draw_points(img, image_points, {255, 0, 0});
 
       // ===== 预测值单独导出 =====
       // ① 预测打击点球坐标：mpc_aim 弹道迭代最后一次 predict 的结果（飞行时间时域）
@@ -217,6 +237,25 @@ int main(int argc, char * argv[])
       }
     }
 
+    // ===== 大符相位引擎专属曲线（仅 BIG_BUFF 模式导出，含无检测帧，可看断流区间）=====
+    // 相位链：big_raw_phase_a/b（双候选原始观测相位）-> big_cont_phase（连续化）
+    // -> big_fitted_phase（模型拟合），收敛后 cont 与 fitted 应重合；
+    // 转速链：big_omega/a/b/spd 对应 v(t)=a*cos(ωt+δ)+b 的模型参数与当前值。
+    if (mode == io::GimbalMode::BIG_BUFF) {
+      const auto & eng = *big_target.engine();
+      data["big_raw_phase_a"] = eng.raw_phase_a() * 57.3;        // 主候选原始相位（度）
+      data["big_raw_phase_b"] = eng.raw_phase_b() * 57.3;        // 副候选原始相位（度）
+      data["big_cont_phase"] = eng.continuous_phase() * 57.3;    // 连续化相位（度）
+      data["big_fitted_phase"] = eng.fitted_phase_now() * 57.3;  // 拟合相位（度）
+      const auto & m = eng.motion();
+      data["big_omega"] = m.speed_angular_frequency;  // ω（rad/s）
+      data["big_amp"] = m.speed_amplitude;            // a 振幅（rad/s）
+      data["big_bias"] = m.phase_linear_velocity;     // b 基础转速（rad/s）
+      data["big_spd"] = eng.speed_now();              // 当前转速 v(t)（rad/s）
+      data["big_model_ready"] = eng.model_ready() ? 1 : 0;  // 运动方程有效性
+      data["big_radius"] = eng.radius();              // 符心->靶心半径 EMA（m）
+    }
+
     // 云台响应情况
     data["gimbal_yaw"] = gs.yaw * 57.3;
     data["gimbal_pitch"] = gs.pitch * 57.3;
@@ -225,6 +264,7 @@ int main(int argc, char * argv[])
 
     // tracker 状态机阶段：0=CONVERGING 1=TRACKING 2=TEMP_LOST 3=LOST
     // （全程导出，LOST 时曲线掉到 3，能直接看到跟踪断流的区间）
+    // 注：大符模式无 HW 状态机，此值恒为 3(LOST)；断流/有效性看 big_model_ready。
     data["tracker_status"] = static_cast<int>(target.tracker_status());
 
     // aimer 跳变检测：突变累计次数 / 当前帧是否判定切扇叶（禁火）
