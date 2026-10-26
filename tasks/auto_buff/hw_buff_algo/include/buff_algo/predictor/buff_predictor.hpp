@@ -22,9 +22,11 @@ public:
     // 内部会自动补偿状态数据的滞后时间(state_age_)。
     Eigen::Vector3f predict_position(float dt);
 
-private:
+    // 预测从"预测基准时刻"起 dt 秒后的扇叶 roll（弧度），同样含 state_age 补偿。
+    // 公开以供调试导出（Target::predict_roll 转发）。
     float predict_roll(float dt) const;
 
+private:
     BuffState state_;
     bool has_state_ = false;
     float state_age_ = 0.0f;

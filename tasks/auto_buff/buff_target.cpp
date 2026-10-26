@@ -36,41 +36,16 @@ Eigen::VectorXd Target::ekf_x() const
   return x;
 }
 
-Eigen::Vector3d Target::apply_aim_radius(const Eigen::Vector3d & leaf_world) const
-{
-  if (!has_r_center_ || std::fabs(aim_radius_offset_) < 1e-9) return leaf_world;
-  const Eigen::Vector3d v = leaf_world - r_center_world_;
-  const double n = v.norm();
-  if (n < 1e-6) return leaf_world;  // 退化保护
-  return r_center_world_ + v * ((n + aim_radius_offset_) / n);
-}
-
 namespace
 {
-// 读取瞄准点相对偏移（米）：
-//   1) hw_buff.aim_radius_offset  —— 首选
-//   2) buff_aim_radius            —— 旧键，是"距圆心的绝对半径"，其参照值 0.70m 已知偏大
-//                                    （实测扇叶中心真实半径约 0.55m），换算成偏移 = 旧值 - 0.70
-//   3) 默认 +0.08m（约装甲板中心）
-double read_aim_radius_offset(const YAML::Node & yaml)
-{
-  const YAML::Node hw = yaml["hw_buff"];
-  if (hw && hw["aim_radius_offset"] && hw["aim_radius_offset"].IsScalar())
-    return hw["aim_radius_offset"].as<double>();
-  const YAML::Node top = yaml["buff_aim_radius"];
-  if (top && top.IsScalar()) return top.as<double>() - 0.70;
-  return 0.08;
-}
-
 // 从 config 读取 HW 配置目录并构造 tracker/predictor
 void init_hw_chain(
   const std::string & config_path, buff_algo::BuffMode mode,
   std::shared_ptr<buff_algo::BuffTracker> & tracker,
-  std::shared_ptr<buff_algo::BuffPredictor> & predictor, double & aim_radius_offset)
+  std::shared_ptr<buff_algo::BuffPredictor> & predictor)
 {
   auto yaml = YAML::LoadFile(config_path);
   const std::string config_dir = yaml["hw_buff"]["config_dir"].as<std::string>();
-  aim_radius_offset = read_aim_radius_offset(yaml);
 
   cv::FileStorage tracker_fs(config_dir + "/tracker/tracker.yaml", cv::FileStorage::READ);
   cv::FileStorage predictor_fs(config_dir + "/predictor/predictor.yaml", cv::FileStorage::READ);
@@ -140,7 +115,7 @@ SmallTarget::SmallTarget() : Target() {}
 
 SmallTarget::SmallTarget(const std::string & config_path) : Target()
 {
-  init_hw_chain(config_path, buff_algo::BuffMode::SMALL_BUFF, tracker_, predictor_, aim_radius_offset_);
+  init_hw_chain(config_path, buff_algo::BuffMode::SMALL_BUFF, tracker_, predictor_);
 }
 
 void SmallTarget::get_target(
@@ -164,22 +139,16 @@ void SmallTarget::get_target(
     lost_cn_ = 0;
   }
 
-  if (p.has_value()) {
-    r_center_world_ = p.value().blade_xyz_in_world;  // 由 Solver::solve 填充
-    has_r_center_ = true;
-  }
-
   unsolvable_ = !update_hw(
     p, ts, tracker_, predictor_, state_, R_gimbal2world_, t_camera2gimbal_, R_fix_,
     aim_point_world_, first_in_);
-  aim_point_world_ = apply_aim_radius(aim_point_world_);
 }
 
 void SmallTarget::predict(double dt)
 {
   if (!tracker_ || !predictor_ || unsolvable_) return;
   Eigen::Vector3f leaf_cam = predictor_->predict_position(static_cast<float>(dt));
-  aim_point_world_ = apply_aim_radius(R_gimbal2world_ * (R_fix_ * leaf_cam.cast<double>() + t_camera2gimbal_));
+  aim_point_world_ = R_gimbal2world_ * (R_fix_ * leaf_cam.cast<double>() + t_camera2gimbal_);
   spd = state_.roll_velocity;
 }
 
@@ -189,7 +158,7 @@ BigTarget::BigTarget() : Target() {}
 
 BigTarget::BigTarget(const std::string & config_path) : Target()
 {
-  init_hw_chain(config_path, buff_algo::BuffMode::BIG_BUFF, tracker_, predictor_, aim_radius_offset_);
+  init_hw_chain(config_path, buff_algo::BuffMode::BIG_BUFF, tracker_, predictor_);
 }
 
 void BigTarget::get_target(
@@ -213,22 +182,16 @@ void BigTarget::get_target(
     lost_cn_ = 0;
   }
 
-  if (p.has_value()) {
-    r_center_world_ = p.value().blade_xyz_in_world;  // 由 Solver::solve 填充
-    has_r_center_ = true;
-  }
-
   unsolvable_ = !update_hw(
     p, ts, tracker_, predictor_, state_, R_gimbal2world_, t_camera2gimbal_, R_fix_,
     aim_point_world_, first_in_);
-  aim_point_world_ = apply_aim_radius(aim_point_world_);
 }
 
 void BigTarget::predict(double dt)
 {
   if (!tracker_ || !predictor_ || unsolvable_) return;
   Eigen::Vector3f leaf_cam = predictor_->predict_position(static_cast<float>(dt));
-  aim_point_world_ = apply_aim_radius(R_gimbal2world_ * (R_fix_ * leaf_cam.cast<double>() + t_camera2gimbal_));
+  aim_point_world_ = R_gimbal2world_ * (R_fix_ * leaf_cam.cast<double>() + t_camera2gimbal_);
   spd = state_.roll_velocity;
 }
 

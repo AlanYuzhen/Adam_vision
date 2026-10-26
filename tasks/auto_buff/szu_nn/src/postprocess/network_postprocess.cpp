@@ -96,7 +96,7 @@ bool shouldAppendArmorResult(const NetArmorResult &result, const int my_color, s
         {
             // 历史装甲板为待识别颜色，类别相同且 IOU 通过，可提供自瞄识别
             if (((my_color == 0 && history_result.color_id == 0) ||
-                 (my_color == 1 && history_result.color_id == 1)) &&
+                (my_color == 1 && history_result.color_id == 1)) &&
                 history_result.armor_id == result.armor_id &&
                 getArmorIoU(history_result, result) > 0.3) 
                 return true;

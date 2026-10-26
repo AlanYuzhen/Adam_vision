@@ -174,7 +174,6 @@ buff_yaw_offset_b: -1.5   # 截距(degree)，yaw=0时的偏置
 buff_pitch_offset_k: 0.05  # 斜率(无量纲)，正值=pitch越大偏置越大（打高偏低调大）
 buff_pitch_yaw_cross_k: -0.04  # 交叉耦合(无量纲)，负值=左边降pitch右边升pitch（修正左上右下）
 buff_pitch_offset_b: 1.7 # 截距(degree)，pitch=0时的偏置
-# 打符瞄准点微调已改为相对偏移，见下方 hw_buff.aim_radius_offset (旧键 buff_aim_radius 仍兼容)
 fire_gap_time: 0.600 # s
 predict_time: 0.213 # s (打慢了加大提前量)
 
@@ -182,14 +181,12 @@ predict_time: 0.213 # s (打慢了加大提前量)
 hw_buff:
   engine_path: "/home/asus/Alan/2027_preview/tasks/auto_buff/hw_buff_algo/config/buff.engine"
   config_dir: "/home/asus/Alan/2027_preview/tasks/auto_buff/hw_buff_algo/config"
-  aim_radius_offset: 0.0  # m，在"符中心->扇叶中心"方向外推；0=扇叶中心, +0.08≈装甲板中心
-                            # 实测扇叶中心真实半径 ≈0.55m（旧版硬编码 0.70m 偏大 0.15m）
   buff_color: 1        # 0=蓝方, 1=红方
-  # 注意：以下 buff_mode / buff_color / confidence_threshold / nms_threshold
+  # 运行模式（auto_buff_debug_mpc 读取）：
+  # 1=跟随电控mode(0/1不下发控制, 2=小符, 3=大符)  2=强制小符  3=强制大符
+  run_mode: 1
+  # 注意：以下 buff_color / confidence_threshold / nms_threshold
   #       目前没有任何 C++ 代码读取，改它们不会生效。
-  #       小符/大符由程序里构造 SmallTarget 还是 BigTarget 决定：
-  #       auto_buff_debug_mpc 固定用 SmallTarget（强制小符）。
-  buff_mode: 1         # 1=小符, 2=大符（当前仅为记录，不生效）
   confidence_threshold: 0.5
   nms_threshold: 0.45
 
