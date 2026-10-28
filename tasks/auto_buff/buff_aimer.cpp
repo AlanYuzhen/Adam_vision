@@ -200,8 +200,13 @@ bool Aimer::get_send_angle(
     return false;
   }
 
-  // 根据第一个弹道飞行时间预测目标位置
-  target.predict(trajectory0.fly_time);
+  // 根据第一个弹道飞行时间预测目标位置。
+  // 关键：predict(dt) 的基准是"拍照时刻"。子弹在 now(=拍照+处理延迟) 发射、
+  // 在 now+fly_time 命中，所以第二次预测必须补上处理延迟 delay（detect_now_gap
+  // 或固定 0.1s）。入参 predict_time = delay + predict_time_，故 delay = predict_time - predict_time_。
+  const double delay = predict_time - predict_time_;
+  const double final_horizon = delay + trajectory0.fly_time;
+  target.predict(final_horizon);
   angle = target.ekf_x()[5];
 
   // 计算新的目标点的空间坐标
@@ -223,8 +228,8 @@ bool Aimer::get_send_angle(
   }
 
   // 计算偏航角和俯仰角，并返回命中结果
-  // 注意：最终预测时域是 trajectory0.fly_time（弹道飞行时间），不是入参 predict_time
-  if (horizon) *horizon = trajectory0.fly_time;
+  // 注意：最终预测时域是 delay + trajectory0.fly_time（含处理延迟），不是入参 predict_time
+  if (horizon) *horizon = final_horizon;
   yaw = std::atan2(aim_in_world[1], aim_in_world[0]) + yaw_offset_;
   pitch = trajectory1.pitch + pitch_offset_;
   return true;

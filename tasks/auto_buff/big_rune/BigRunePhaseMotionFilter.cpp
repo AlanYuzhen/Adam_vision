@@ -358,47 +358,14 @@ double BigRunePhaseMotionFilter::guess_phase(Time future_time)
 
   // ps：使用线性量预测鲁棒性很好，后面的两种算法在连续切换目标的时候会出现bug(加速度异常/速度异常)
   // 后续多数据猜测算法可以优化一下
-  if (true) {
-    // 只有一个数据,那么直接用线性量进行预测
-    double phase_linear_velocity = cfg_.expect_phase_linear_velocity;
-    m_rotation_direction == RotationDirection::anticlockwise
-      ? phase_linear_velocity = -phase_linear_velocity
-      : phase_linear_velocity = phase_linear_velocity;
-    const double time_interval =
-      minus_ms(future_time, m_tracked_target_deque.back().capture_timestamp) * 0.001;
-    return m_tracked_target_deque.back().continuous_phase + phase_linear_velocity * time_interval;
-  } else if (m_tracked_target_deque.size() == 2) {
-    // 有两个数据,使用帧差法来进行预测
-    const double delta_phase = calculate_delta_phase<rad>(
-      m_tracked_target_deque.back().continuous_phase,
-      m_tracked_target_deque.front().continuous_phase);
-    const double omega = delta_phase /
-                         (minus_ms(
-                            m_tracked_target_deque.back().capture_timestamp,
-                            m_tracked_target_deque.front().capture_timestamp) *
-                          0.001);
-    const double time_interval =
-      minus_ms(future_time, m_tracked_target_deque.back().capture_timestamp) * 0.001;
-    return m_tracked_target_deque.back().continuous_phase + omega * time_interval;
-  } else {
-    const TrackedTarget & target_0 = m_tracked_target_deque[m_tracked_target_deque.size() - 3];
-    const TrackedTarget & target_1 = m_tracked_target_deque[m_tracked_target_deque.size() - 2];
-    const TrackedTarget & target_2 = m_tracked_target_deque.back();
-
-    const double dt_01 =
-      minus_ms(target_1.capture_timestamp, target_0.capture_timestamp) * 0.001;
-    const double dt_12 =
-      minus_ms(target_2.capture_timestamp, target_1.capture_timestamp) * 0.001;
-    const double dt_future = minus_ms(future_time, target_2.capture_timestamp) * 0.001;
-
-    const double velocity_01 = (target_1.continuous_phase - target_0.continuous_phase) / dt_01;
-    const double velocity_12 = (target_2.continuous_phase - target_1.continuous_phase) / dt_12;
-    const double acceleration = (velocity_12 - velocity_01) / ((dt_01 + dt_12) * 0.5);
-    const double latest_velocity = velocity_12 + 0.5 * acceleration * dt_12;
-
-    return target_2.continuous_phase + latest_velocity * dt_future +
-           0.5 * acceleration * dt_future * dt_future;
+  // 只有一个数据,那么直接用线性量进行预测
+  double phase_linear_velocity = cfg_.expect_phase_linear_velocity;
+  if (m_rotation_direction == RotationDirection::anticlockwise) {
+    phase_linear_velocity = -phase_linear_velocity;
   }
+  const double time_interval =
+    minus_ms(future_time, m_tracked_target_deque.back().capture_timestamp) * 0.001;
+  return m_tracked_target_deque.back().continuous_phase + phase_linear_velocity * time_interval;
 }
 
 void BigRunePhaseMotionFilter::update_tracked_target_deque()

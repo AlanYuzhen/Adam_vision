@@ -30,7 +30,7 @@ void LM_IRLS_BigRunePhaseMotionFilter::prepare_date()
 
   // 由于可以认为间隔是相对稳定的，所以取中值时间戳代替平均值时间戳
   const Time reference_timestamp =
-    m_tracked_target_deque[static_cast<int>(m_tracked_target_deque.size() * 0.5 + 1)]
+    m_tracked_target_deque[static_cast<int>(m_tracked_target_deque.size() * 0.5)]
       .capture_timestamp;
 
   // 时间权重与去中心化时间
@@ -298,7 +298,7 @@ void LM_IRLS_BigRunePhaseMotionFilter::complete_motion(
   const double b = theta(2);  // b
   const double C = theta(3);  // C
   const double speed_amplitude = omega * std::sqrt(A * A + B * B);  // a = ω * sqrt(A^2 + B^2)
-  double speed_phase_shift = std::atan2(B, -A);                     // δ = atan2(B, -A)
+  double speed_phase_shift = std::atan2(A, B);                      // δ = atan2(A, B)
 
   // 安全检查
   if (

@@ -191,6 +191,7 @@ void BigTarget::get_target(
   // 按丢帧处理。PnP 成功帧的旋转块不可能恰为单位阵，判据安全。
   if (pr.pose_camera.isApprox(Eigen::Matrix4d::Identity())) {
     engine_->update_lost();
+    if (engine_->is_unsolve()) unsolvable_ = true;
     return;
   }
 

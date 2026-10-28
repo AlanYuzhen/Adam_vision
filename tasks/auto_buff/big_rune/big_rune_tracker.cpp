@@ -96,7 +96,7 @@ void BigRuneTracker::update(const PowerRune & pr, std::chrono::steady_clock::tim
   // 半径 EMA：PnP 距离噪声大，标量平滑即可
   const double r_now = (armor_center_world - rune_center_world).norm();
   if (r_now > 0.3 && r_now < 1.2) {
-    radius_ = radius_ < 0.0 ? r_now : 0.95 * radius_ + 0.05 * r_now;
+    radius_ = 0.95 * radius_ + 0.05 * r_now;
   }
 
   lost_cn_ = 0;

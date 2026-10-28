@@ -92,7 +92,7 @@ struct TrackedTarget : public CandidateTarget
 };
 
 // 运动方程参数：phase(t) = A*cos(ωt) + B*sin(ωt) + b*t + C
-// 物理转速 v(t) = a*cos(ωt + δ) + b，其中 a = ω*sqrt(A²+B²)，δ = atan2(B, -A)
+// 物理转速 v(t) = a*cos(ωt + δ) + b，其中 a = ω*sqrt(A²+B²)，δ = atan2(A, B)
 struct MotionModelParams
 {
   Time reference_timestamp = 0;  // 方程参考时刻（建模型数据的中位时间戳）
